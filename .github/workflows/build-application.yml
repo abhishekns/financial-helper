@@ -1,0 +1,36 @@
+name: build-application
+
+on:
+  push:
+    tags-ignore:
+      - 'v*.*.*'
+  pull_request:
+
+jobs:
+  desktop-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller pytest
+
+      - name: Run tests before desktop build
+        run: pytest -q
+
+      - name: Build Tkinter application bundle
+        run: pyinstaller --noconfirm --onefile --name financial-helper --paths src src/financial_helper/__main__.py
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-helper-desktop-app
+          path: dist/financial-helper*
