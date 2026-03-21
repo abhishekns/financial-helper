@@ -1,11 +1,25 @@
 from __future__ import annotations
 
+import logging
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from .agents import FinancialAssistantSystem
 from .document_io import load_document_asset
 from .models import DocumentAsset
+
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+
+    _DND_AVAILABLE = True
+except ImportError:
+    DND_FILES = None
+    TkinterDnD = None
+    _DND_AVAILABLE = False
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FinancialHelperApp:
@@ -17,6 +31,7 @@ class FinancialHelperApp:
         self.root.geometry("1100x720")
         self.system = FinancialAssistantSystem()
         self.documents: list[DocumentAsset] = []
+        self.drag_drop_available = _DND_AVAILABLE
 
         self._build_layout()
 
@@ -58,9 +73,15 @@ class FinancialHelperApp:
         ttk.Button(actions, text="Analyze", command=self.analyze_documents).grid(row=0, column=2, sticky="ew", padx=8)
         ttk.Button(actions, text="Clear", command=self.clear_documents).grid(row=0, column=3, sticky="ew", padx=(8, 0))
 
-        ttk.Label(controls, text="Uploaded documents").grid(row=1, column=0, sticky="w")
+        label_text = "Uploaded documents"
+        if self.drag_drop_available:
+            label_text += " (drag and drop files here)"
+        ttk.Label(controls, text=label_text).grid(row=1, column=0, sticky="w")
         self.document_list = tk.Listbox(controls, height=12)
         self.document_list.grid(row=2, column=0, sticky="nsew", pady=(6, 0))
+        if self.drag_drop_available:
+            self.document_list.drop_target_register(DND_FILES)
+            self.document_list.dnd_bind("<<Drop>>", self._handle_drop)
 
         detail_notebook = ttk.Notebook(self.root)
         detail_notebook.grid(row=1, column=1, sticky="nsew", padx=(0, 16), pady=(0, 16))
@@ -94,11 +115,7 @@ class FinancialHelperApp:
             title="Select financial files",
             filetypes=[("All files", "*.*")],
         )
-        for file_path in selected_files:
-            asset = load_document_asset(file_path)
-            self.documents.append(asset)
-            self.document_list.insert(tk.END, f"{asset.name} ({asset.metadata.get('extraction_status')})")
-        self._refresh_document_details()
+        self._add_assets_from_paths(selected_files)
 
     def add_sample_documents(self) -> None:
         sample_documents = [
@@ -125,6 +142,7 @@ class FinancialHelperApp:
             messagebox.showinfo("Financial Helper", "Add at least one document before analyzing.")
             return
 
+        LOGGER.info("Analyzing %s documents", len(self.documents))
         result = self.system.run(self.documents)
         reminder_lines = []
         for reminder in result["reminders"]:
@@ -165,6 +183,33 @@ class FinancialHelperApp:
             body = "\n\n".join(lines)
         self._set_text(self.documents_text, body)
 
+    def _handle_drop(self, event: tk.Event) -> None:
+        paths = self._parse_drop_files(event.data)
+        if not paths:
+            return
+        self._add_assets_from_paths(paths)
+
+    def _parse_drop_files(self, data: str) -> list[str]:
+        if not data:
+            return []
+        matches = re.findall(r"{([^}]*)}|(\S+)", data)
+        paths = [match[0] or match[1] for match in matches]
+        return [path for path in paths if path]
+
+    def _add_assets_from_paths(self, paths: list[str] | tuple[str, ...]) -> None:
+        if not paths:
+            return
+        for file_path in paths:
+            try:
+                asset = load_document_asset(file_path)
+            except OSError as exc:
+                LOGGER.warning("Failed to load document: %s", file_path, exc_info=exc)
+                messagebox.showwarning("Financial Helper", f"Could not load {file_path}")
+                continue
+            self.documents.append(asset)
+            self.document_list.insert(tk.END, f"{asset.name} ({asset.metadata.get('extraction_status')})")
+        self._refresh_document_details()
+
     def _default_workflow_guide(self) -> str:
         return (
             "Suggested workflow\n"
@@ -196,7 +241,16 @@ class FinancialHelperApp:
 
 
 def main() -> None:
-    root = tk.Tk()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    if _DND_AVAILABLE and TkinterDnD is not None:
+        root = TkinterDnD.Tk()
+    else:
+        if not _DND_AVAILABLE:
+            LOGGER.info("Drag-and-drop disabled (tkinterdnd2 not installed)")
+        root = tk.Tk()
     FinancialHelperApp(root)
     root.mainloop()
 
