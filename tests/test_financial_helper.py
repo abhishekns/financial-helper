@@ -31,6 +31,24 @@ def test_end_to_end_generates_tax_and_investment_reminders() -> None:
     assert "Mortgage from mortgage-notes.docx" in titles
 
 
+def test_extracts_dmy_and_relative_dates() -> None:
+    system = FinancialAssistantSystem()
+    documents = [
+        DocumentAsset(
+            name="india-tax.txt",
+            document_type="txt",
+            content="Property tax due 15/04/2026 and insurance renewal next Friday",
+        )
+    ]
+
+    result = system.run(documents, today=date(2026, 3, 20))
+
+    assert len(result["events"]) >= 2
+    due_dates = {event.due_date for event in result["events"]}
+    assert date(2026, 4, 15) in due_dates
+    assert date(2026, 3, 27) in due_dates
+
+
 def test_load_document_asset_reads_plain_text_files(tmp_path: Path) -> None:
     sample_file = tmp_path / "tax-notes.txt"
     sample_file.write_text("Property tax due 2026-06-01", encoding="utf-8")

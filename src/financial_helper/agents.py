@@ -20,7 +20,7 @@ class FinancialAssistantSystem:
     def run(self, documents: list[DocumentAsset], today: date | None = None) -> dict[str, Any]:
         current_date = today or date.today()
         normalized_documents = self.ingestion_agent.ingest(documents)
-        events = self.extractor_agent.extract(normalized_documents)
+        events = self.extractor_agent.extract(normalized_documents, today=current_date)
         reminders = self.reminder_agent.plan(events, today=current_date)
         return {
             "documents": normalized_documents,
