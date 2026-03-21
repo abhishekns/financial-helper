@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 
 from .models import DocumentAsset
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DocumentIngestionAgent:
@@ -14,6 +17,7 @@ class DocumentIngestionAgent:
     """
 
     def ingest(self, documents: Iterable[DocumentAsset]) -> list[DocumentAsset]:
+        LOGGER.info("Normalizing incoming documents")
         normalized: list[DocumentAsset] = []
         for document in documents:
             cleaned_content = " ".join(document.content.split())
@@ -30,4 +34,5 @@ class DocumentIngestionAgent:
                     metadata=merged_metadata,
                 )
             )
+        LOGGER.info("Normalized %s documents", len(normalized))
         return normalized

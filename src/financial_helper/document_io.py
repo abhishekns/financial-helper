@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from .models import DocumentAsset
+
+LOGGER = logging.getLogger(__name__)
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".log"}
 
@@ -27,7 +30,7 @@ def load_document_asset(path: str | Path) -> DocumentAsset:
         )
         extraction_status = "placeholder"
 
-    return DocumentAsset(
+    asset = DocumentAsset(
         name=file_path.name,
         document_type=suffix.lstrip(".") or "unknown",
         content=content,
@@ -37,3 +40,5 @@ def load_document_asset(path: str | Path) -> DocumentAsset:
             "extraction_status": extraction_status,
         },
     )
+    LOGGER.info("Loaded document %s (%s)", asset.name, extraction_status)
+    return asset
