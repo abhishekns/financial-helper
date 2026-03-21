@@ -89,12 +89,14 @@ class FinancialHelperApp:
         self.reminders_text = tk.Text(detail_notebook, wrap="word")
         self.workflows_text = tk.Text(detail_notebook, wrap="word")
         self.documents_text = tk.Text(detail_notebook, wrap="word")
-        for widget in (self.reminders_text, self.workflows_text, self.documents_text):
+        self.extraction_text = tk.Text(detail_notebook, wrap="word")
+        for widget in (self.reminders_text, self.workflows_text, self.documents_text, self.extraction_text):
             widget.configure(state="disabled")
 
         detail_notebook.add(self.reminders_text, text="Reminders")
         detail_notebook.add(self.workflows_text, text="Workflows")
         detail_notebook.add(self.documents_text, text="Document details")
+        detail_notebook.add(self.extraction_text, text="Extraction details")
 
         self._set_text(
             self.workflows_text,
@@ -108,6 +110,10 @@ class FinancialHelperApp:
             self.documents_text,
             "Supported immediately: .txt, .md, .csv, .json, .log\n"
             "Planned next: PDF, DOCX, XLSX, scanned images via parser/OCR integrations.",
+        )
+        self._set_text(
+            self.extraction_text,
+            "Extraction details will appear after you analyze documents.",
         )
 
     def add_files(self) -> None:
@@ -157,6 +163,7 @@ class FinancialHelperApp:
 
         self._set_text(self.reminders_text, "\n\n".join(reminder_lines))
         self._set_text(self.workflows_text, self._workflow_guide_for_results(result["summary"]))
+        self._set_text(self.extraction_text, self._format_extraction_details(result["events"]))
         self._refresh_document_details()
 
     def clear_documents(self) -> None:
@@ -164,6 +171,7 @@ class FinancialHelperApp:
         self.document_list.delete(0, tk.END)
         self._set_text(self.reminders_text, "No analysis yet. Add one or more documents, then click Analyze.")
         self._set_text(self.workflows_text, self._default_workflow_guide())
+        self._set_text(self.extraction_text, "Extraction details will appear after you analyze documents.")
         self._refresh_document_details()
 
     def _refresh_document_details(self) -> None:
@@ -232,6 +240,25 @@ class FinancialHelperApp:
             "- Capture corrected dates and train future extraction rules.\n"
             "- Send a weekly digest of new obligations."
         )
+
+    def _format_extraction_details(self, events: list[object]) -> str:
+        if not events:
+            return "No extraction details available."
+        lines = []
+        for event in events:
+            details = getattr(event, "details", {})
+            matched = details.get("matched_text", "unknown")
+            parser = details.get("parser", "unknown")
+            keyword = details.get("keyword", "unknown")
+            lines.append(
+                f"- {event.title}\n"
+                f"  due: {event.due_date.isoformat()}\n"
+                f"  keyword: {keyword}\n"
+                f"  matched text: {matched}\n"
+                f"  parser: {parser}\n"
+                f"  source: {', '.join(event.source_documents)}"
+            )
+        return "\n\n".join(lines)
 
     def _set_text(self, widget: tk.Text, value: str) -> None:
         widget.configure(state="normal")
